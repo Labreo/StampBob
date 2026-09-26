@@ -346,9 +346,18 @@ class _UnbufferedChannelChecker(_BaseChecker):
 
 # Names that are safe to dereference without a nil check (builtins / keywords)
 _GO_SAFE_NAMES: Set[str] = {
+    # Standard library packages
     "ctx", "err", "ok", "os", "fmt", "log", "http", "io", "strings",
     "bytes", "json", "sync", "atomic", "math", "sort", "time", "strconv",
     "filepath", "context", "errors", "unicode", "reflect", "runtime",
+    # HTTP request parameter — r *http.Request fields are never nil
+    "r", "req", "resp",
+    # Standard test parameters (testing.T / testing.B) — always valid
+    "t", "b", "tb",
+    # gRPC / metadata / tracing framework package-level names
+    "grpc", "metadata", "trace",
+    # "next" is the standard HTTP middleware chain — always non-nil
+    "next",
 }
 _PY_SAFE_NAMES: Set[str] = {
     "self", "cls", "os", "sys", "re", "json", "logging", "pathlib",
@@ -357,31 +366,104 @@ _PY_SAFE_NAMES: Set[str] = {
 }
 
 
+# Go: recognises "if err != nil { return/fatal/... }" error-guard that
+# implies the paired value variable is non-nil.
+_GO_ERR_GUARD_RE = re.compile(
+    r"\bif\s+err\s*!=\s*nil\s*\{[^}]*(?:return|t\.Fatal|panic|log\.Fatal)",
+    re.DOTALL,
+)
+
+# Detects `x, err :=` so we can correlate x with its error guard
+_GO_MULTI_RETURN_ERR_RE = re.compile(
+    r"\b(\w+)\s*,\s*err\s*:="
+)
+
+
 def _has_nil_guard(body_text: str, var_name: str, language: str) -> bool:
-    """Return True when *body_text* contains a nil/None guard for *var_name*."""
+    """Return True when *body_text* contains a nil/None guard for *var_name*.
+
+    Comment lines (``//`` for Go, ``#`` for Python) are stripped before
+    searching so that advisory notes like ``// Missing: if x == nil`` do not
+    produce false-safe signals.
+
+    For Go, also recognises the idiomatic error-guard pattern:
+    ``x, err := f(); if err != nil { return/fatal/... }`` — when `var_name`
+    was assigned as the first value in such a pair and the body contains a
+    well-formed error guard, the value is considered protected.
+    """
+    # Strip single-line comments before pattern matching
     if language == "go":
+        # Remove everything from // to end of line
+        clean = re.sub(r"//.*", "", body_text)
         pattern = re.compile(
             rf"\bif\s+{re.escape(var_name)}\s*[!=]=\s*nil\b"
             rf"|\bif\s+\w+(?:,\s*\w+)*\s*:=.*;\s*{re.escape(var_name)}\s*[!=]=\s*nil\b"
         )
+        if pattern.search(clean):
+            return True
+        # Idiomatic error guard: `x, err := f()` + `if err != nil { return }`
+        paired_vars = {m.group(1) for m in _GO_MULTI_RETURN_ERR_RE.finditer(clean)}
+        if var_name in paired_vars and _GO_ERR_GUARD_RE.search(clean):
+            return True
+        return False
     else:
+        clean = re.sub(r"#.*", "", body_text)
         pattern = re.compile(
             rf"\bif\s+{re.escape(var_name)}\s+is\s+(?:not\s+)?None\b"
         )
-    return bool(pattern.search(body_text))
+        return bool(pattern.search(clean))
 
 
 class _NilCheckBoundaryChecker(_BaseChecker):
     rule = NIL_CHECK_BOUNDARY_RULE
 
-    # Go: pointer types returned from common constructor patterns
+    # Go: pointer/nil-producing assignments — five forms matched:
+    #
+    #   1. Multi-return:    user, err := db.Find(...)  /  val, _ := f()
+    #      — captures the first identifier (the value, not the error/blank)
+    #   2. Call (method chain / constructor):
+    #                       user := s.db.FindUser(...)  /  obj := NewClient(cfg)
+    #   3. Address-of / new: p := &Foo{}  /  u := new(User)
+    #   4. Field / chained field access (assigned pointer field):
+    #                       addr := order.ShippingAddress
+    #                       discountPct := cart.Discount.Percentage
+    #   5. Map/slice index: p := l.registry[name]  /  e := m["key"]
+    #   6. Type assertion:  user := val.(*User)
     _GO_PTR_ASSIGN_RE = re.compile(
-        r"\b(\w+)\s*(?::=|=)\s*(?:new\(|&\w+|[A-Z]\w+\()"
+        r"(?:"
+        # (1) multi-return: captures first ident before the comma
+        r"\b(\w+)\s*,\s*\w+\s*:="
+        r"|"
+        # (2)+(3) single-var: call, constructor, address-of, or dotted call
+        r"\b(\w+)\s*(?::=|=)\s*(?:new\(|&\w+|\w+(?:\.\w+)+\(|[A-Z]\w*\()"
+        r"|"
+        # (4) field access assignment: `x := a.B` or `x := a.B.C`
+        r"\b(\w+)\s*:=\s*\w+(?:\.\w+)+"
+        r"|"
+        # (5) map/slice index: `x := m[key]`
+        r"\b(\w+)\s*:=\s*\w+(?:\.\w+)*\[.+?\]"
+        r"|"
+        # (6) type assertion: `x := expr.(*Type)` or `x := expr.(Type)`
+        r"\b(\w+)\s*:=\s*.+\.\([*]?\w+\)"
+        r")"
     )
     # Python: assignment from Optional-annotated call (heuristic)
     _PY_OPT_ASSIGN_RE = re.compile(
         r"\b(\w+)\s*(?::=|=)\s*\w+\("
     )
+
+    # Go: map/slice subscript dereference without a preceding nil guard —
+    # e.g.  `md["key"]` where `md` may be a nil map.
+    _GO_MAP_DEREF_RE = re.compile(r"\b([a-z_]\w*)\[")
+
+    # Go: chained field access — `a.B.C` — where `a.B` may be nil.
+    # We capture `a` + `B` so we can synthesise the intermediate name `a_B`
+    # and check for a nil guard on it using comment-stripped body text.
+    _GO_CHAIN_DEREF_RE = re.compile(r"\b([a-z_]\w*)\.([A-Z]\w*)(?:\.\w+)+")
+
+    # Go: range over a field that may be nil — `for k, v := range x.Field {`
+    # emits `x` as a potentially-nil receiver.
+    _GO_RANGE_FIELD_RE = re.compile(r"\brange\s+([a-z_]\w*)\.\w+")
 
     def check(
         self,
@@ -390,7 +472,13 @@ class _NilCheckBoundaryChecker(_BaseChecker):
         repo_index: RepositoryIndex,
     ) -> List[InvariantViolation]:
         violations: List[InvariantViolation] = []
-        language = (fs.language if fs else "unknown")
+        # Infer language from file extension when FileSymbols not available
+        # (diff-only mode used during offline benchmark evaluation).
+        if fs is not None:
+            language = fs.language
+        else:
+            ext = Path(hunk.file_path).suffix.lower()
+            language = "go" if ext == ".go" else ("python" if ext == ".py" else "unknown")
 
         if language not in ("go", "python"):
             return violations
@@ -402,33 +490,56 @@ class _NilCheckBoundaryChecker(_BaseChecker):
         )
         safe_names = _GO_SAFE_NAMES if language == "go" else _PY_SAFE_NAMES
 
+        ptr_re = (
+            self._GO_PTR_ASSIGN_RE
+            if language == "go"
+            else self._PY_OPT_ASSIGN_RE
+        )
+
         for line, lineno in zip(hunk.lines, hunk.line_numbers):
             stripped = line.strip()
             if _COMMENT_LINE_RE.match(stripped) or not stripped:
                 continue
 
-            for m in deref_re.finditer(line):
-                var_name = m.group(1)
-                if var_name in safe_names:
-                    continue
+            # ----------------------------------------------------------------
+            # Build the set of potentially-nil variables once per line so
+            # that body_text is only resolved a minimum number of times.
+            # ----------------------------------------------------------------
+            qualname, body = _enclosing_function_body(
+                hunk.file_path, lineno, fs
+            )
+            body_text = "\n".join(body) if body else "\n".join(hunk.lines)
 
-                qualname, body = _enclosing_function_body(
-                    hunk.file_path, lineno, fs
-                )
-                body_text = "\n".join(body) if body else "\n".join(hunk.lines)
+            ptr_vars = {
+                next(g for g in m2.groups() if g is not None)
+                for m2 in ptr_re.finditer(body_text)
+            }
+
+            # Also treat variables used in `for … range x.Field` as
+            # potentially-nil receivers (e.g. `m` in `range m.Labels`).
+            if language == "go":
+                for rm in self._GO_RANGE_FIELD_RE.finditer(body_text):
+                    ptr_vars.add(rm.group(1))
+
+            # ----------------------------------------------------------------
+            # Case A — standard deref candidates: `var.Field` / `var[…]`
+            # ----------------------------------------------------------------
+            candidates = list(deref_re.finditer(line))
+            if language == "go":
+                for mm in self._GO_MAP_DEREF_RE.finditer(line):
+                    candidates.append(mm)
+
+            seen_vars: set[str] = set()
+            for m in candidates:
+                var_name = m.group(1)
+                if var_name in safe_names or var_name in seen_vars:
+                    continue
+                seen_vars.add(var_name)
 
                 # Skip if a guard already exists anywhere in the enclosing body
                 if _has_nil_guard(body_text, var_name, language):
                     continue
 
-                # Skip if the variable is not the result of a pointer/optional
-                # producing expression — reduces false positives significantly.
-                ptr_re = (
-                    self._GO_PTR_ASSIGN_RE
-                    if language == "go"
-                    else self._PY_OPT_ASSIGN_RE
-                )
-                ptr_vars = {m2.group(1) for m2 in ptr_re.finditer(body_text)}
                 if var_name not in ptr_vars:
                     continue
 
@@ -445,6 +556,41 @@ class _NilCheckBoundaryChecker(_BaseChecker):
                     ),
                     remediation=self.rule.remediation,
                 ))
+
+            # ----------------------------------------------------------------
+            # Case B — chained field dereference: `a.B.C` where `a.B` may
+            # be nil.  We synthesise the intermediate expression as the
+            # "variable name" and look for `if a.B == nil` guards.
+            # Only runs for Go (Python uses is-None guards on scalars).
+            # ----------------------------------------------------------------
+            if language == "go":
+                for cm in self._GO_CHAIN_DEREF_RE.finditer(line):
+                    receiver, field = cm.group(1), cm.group(2)
+                    if receiver in safe_names:
+                        continue
+                    # Synthesised intermediate: `receiver.Field`
+                    intermediate = f"{receiver}.{field}"
+                    # Guard check: `if receiver.Field == nil`
+                    guard_pat = re.compile(
+                        rf"\bif\s+{re.escape(intermediate)}\s*[!=]=\s*nil\b"
+                    )
+                    clean_body = re.sub(r"//.*", "", body_text)
+                    if guard_pat.search(clean_body):
+                        continue
+                    violations.append(InvariantViolation(
+                        rule_id=self.rule.rule_id,
+                        severity=self.rule.severity,
+                        file_path=hunk.file_path,
+                        line_range=(lineno, lineno),
+                        offending_code=line,
+                        ast_context=qualname,
+                        message=(
+                            f"``{intermediate}`` accessed in ``{qualname}`` "
+                            "without a preceding nil guard — chained field "
+                            "may be nil."
+                        ),
+                        remediation=self.rule.remediation,
+                    ))
 
         return violations
 
@@ -613,13 +759,17 @@ class InvariantOracle:
                     fs = parse_ast_symbols(str(candidate))
 
             for checker in self._checkers:
-                # Only run checkers whose language matches this file
+                # Only run checkers whose language matches this file.
+                # Use the FileSymbols language when available (always "python"
+                # or "go"); fall back to the raw extension string for files
+                # that were not indexed.  Compare by value only — Language(lang)
+                # would raise ValueError for short extensions like "py".
                 lang = (fs.language if fs else ext.lstrip("."))
                 rule_langs = checker.rule.languages
+                rule_lang_values = {l.value for l in rule_langs}
                 if (
                     Language.ANY not in rule_langs
-                    and Language(lang) not in rule_langs
-                    and lang not in {l.value for l in rule_langs}
+                    and lang not in rule_lang_values
                 ):
                     continue
 

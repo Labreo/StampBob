@@ -1,0 +1,84 @@
+name: StampBob Eval Gate
+
+on:
+  push:
+    branches:
+      - main
+    paths:
+      - ".bob/**"
+      - "src/engine/**"
+  pull_request:
+    branches:
+      - main
+    paths:
+      - ".bob/**"
+      - "src/engine/**"
+
+permissions:
+  contents: read
+
+jobs:
+  eval-gate:
+    name: Offline Evaluation Benchmark (precision >= 92%)
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # ── Primary path: Bob Shell headless eval ────────────────────────────────
+      # Bob Shell non-interactive mode: bob --chat-mode=<slug> -p "<prompt>"
+      # The reviewer mode's /eval command runs benchmark_harness and exits with
+      # code 1 when the CI gate fails, which causes this step to fail.
+      - name: Run eval gate via Bob Shell (reviewer mode)
+        id: bob_eval
+        continue-on-error: true
+        env:
+          BOB_API_KEY: ${{ secrets.BOB_API_KEY }}
+        run: |
+          bob --chat-mode=reviewer \
+              --hide-intermediary-output \
+              -p "/eval --threshold 0.92" \
+              | tee eval_output.txt
+          echo "bob_exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      # ── Fallback path: direct Python harness ────────────────────────────────
+      # Runs when Bob Shell is not installed or BOB_API_KEY is absent.
+      # benchmark_harness.run_offline_eval() calls sys.exit(1) on gate failure,
+      # so a non-zero exit code here also fails the workflow step.
+      - name: Run eval gate via Python harness (fallback)
+        if: steps.bob_eval.outcome == 'failure' || env.BOB_API_KEY == ''
+        env:
+          BOB_API_KEY: ${{ secrets.BOB_API_KEY }}
+        run: |
+          python -m src.eval.benchmark_harness \
+            --threshold 0.92 \
+            | tee eval_output.txt
+
+      # ── Gate enforcement ─────────────────────────────────────────────────────
+      # If the Bob Shell step ran and returned a non-zero exit, fail explicitly.
+      - name: Enforce eval gate result
+        if: steps.bob_eval.outputs.bob_exit != '' && steps.bob_eval.outputs.bob_exit != '0'
+        run: |
+          echo "::error::Eval gate failed — precision dropped below 92% or hallucination rate exceeded 5%."
+          echo "::error::See eval_output.txt for the full breakdown."
+          exit 1
+
+      - name: Upload eval output
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-output
+          path: eval_output.txt
+          retention-days: 7

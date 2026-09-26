@@ -1,0 +1,154 @@
+name: StampBob PR Review
+
+on:
+  pull_request:
+    types: [opened, synchronize]
+
+permissions:
+  contents: read
+  pull-requests: write  # required for gh pr comment
+
+jobs:
+  stamp-review:
+    name: Verified Stamp Card Review
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repository (full history for diff)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Set up Python 3.12
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+          cache: pip
+
+      - name: Install dependencies
+        run: pip install -r requirements.txt
+
+      # ── Collect PR diff ──────────────────────────────────────────────────────
+      - name: Export PR unified diff
+        run: |
+          git fetch origin ${{ github.base_ref }}
+          git diff origin/${{ github.base_ref }}...HEAD > pr.diff
+          echo "Diff size: $(wc -l < pr.diff) lines"
+
+      # ── Primary path: Bob Shell headless review ──────────────────────────────
+      # Passes the diff path into the reviewer mode via /stamp.
+      # Bob Shell reads pr.diff, runs InvariantOracle.audit_diff(), confirms
+      # violations in the sandbox, and emits the Stamp Card to stdout.
+      - name: Run headless stamp review via Bob Shell
+        id: bob_review
+        continue-on-error: true
+        env:
+          BOB_API_KEY: ${{ secrets.BOB_API_KEY }}
+        run: |
+          bob --chat-mode=reviewer \
+              --hide-intermediary-output \
+              -p "/stamp" \
+              | tee stamp_card.txt
+          echo "bob_exit=${PIPESTATUS[0]}" >> "$GITHUB_OUTPUT"
+
+      # ── Fallback path: Python-based stamp card generation ───────────────────
+      # Runs InvariantOracle directly when Bob Shell is unavailable.
+      - name: Run stamp review via Python fallback
+        id: python_review
+        if: steps.bob_review.outcome == 'failure' || env.BOB_API_KEY == ''
+        env:
+          BOB_API_KEY: ${{ secrets.BOB_API_KEY }}
+        run: |
+          python - <<'PYEOF' | tee stamp_card.txt
+          import sys, textwrap
+          from src.engine.context_indexer import build_repository_index
+          from src.engine.invariant_oracle import InvariantOracle
+          from src.generator.repro_synthesizer import synthesize_repro_test
+          from src.generator.sandbox_runner import run_repro_in_sandbox
+
+          diff = open("pr.diff").read()
+          repo_index = build_repository_index(".")
+          oracle = InvariantOracle()
+          violations = oracle.audit_diff(diff, repo_index)
+
+          confirmed = []
+          for v in violations:
+              try:
+                  repro = synthesize_repro_test(v, repo_index)
+                  result = run_repro_in_sandbox(repro)
+                  v._sandbox_confirmed = (result.returncode != 0)
+              except Exception as exc:
+                  v._sandbox_confirmed = False
+              if v._sandbox_confirmed:
+                  confirmed.append(v)
+
+          verdict = "REJECTED" if confirmed else "APPROVED"
+          confidence = round(1.0 - (len(violations) - len(confirmed)) / max(len(violations), 1), 2) if violations else 1.0
+
+          import subprocess, os
+          sha = subprocess.check_output(["git", "rev-parse", "--short", "HEAD"]).decode().strip()
+          branch = os.environ.get("GITHUB_HEAD_REF", "unknown")
+
+          lines = [
+              "```",
+              "╔══════════════════════════════════════════════════════╗",
+              "║  STAMPBOB VERIFIED STAMP CARD                        ║",
+              "╠══════════════════════════════════════════════════════╣",
+              f"║  PR / Branch   : {branch:<36}║",
+              f"║  Commit        : {sha:<36}║",
+              f"║  Verdict       : {verdict:<36}║",
+              f"║  Confidence    : {confidence:<36}║",
+              "╠══════════════════════════════════════════════════════╣",
+              f"║  VIOLATIONS ({len(confirmed)} confirmed){'':>39}║",
+              "║  ─────────────────────────────────────────────────   ║",
+          ]
+          for i, v in enumerate(violations, 1):
+              sc = "CONFIRMED" if getattr(v, "_sandbox_confirmed", False) else "UNVERIFIED"
+              lines += [
+                  f"║  [{i}] {v.rule_id} · {v.severity.value:<44}║",
+                  f"║      File      : {v.file_path}:{v.line_range[0]}-{v.line_range[1]:<18}║",
+                  f"║      Context   : {v.ast_context:<36}║",
+                  f"║      Message   : {textwrap.shorten(v.message, 36):<36}║",
+                  f"║      Sandbox   : {sc:<36}║",
+              ]
+          lines += [
+              "╠══════════════════════════════════════════════════════╣",
+              "║  Gate: precision >= 0.92, hallucination <= 0.05      ║",
+              "╚══════════════════════════════════════════════════════╝",
+              "```",
+          ]
+          print("\n".join(lines))
+          sys.exit(1 if confirmed else 0)
+          PYEOF
+
+      # ── Post Stamp Card as PR comment ────────────────────────────────────────
+      - name: Post Stamp Card as PR comment
+        if: always()
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          if [ ! -f stamp_card.txt ] || [ ! -s stamp_card.txt ]; then
+            echo "No stamp card output found; skipping comment."
+            exit 0
+          fi
+
+          STAMP_BODY="$(cat stamp_card.txt)"
+
+          gh pr comment ${{ github.event.pull_request.number }} \
+            --repo ${{ github.repository }} \
+            --body "## StampBob Verified Stamp Card
+
+${STAMP_BODY}
+
+---
+*Generated by [StampBob Review Specialist](../.bob/modes/reviewer.json) · commit \`$(git rev-parse --short HEAD)\`*"
+
+      # ── Block merge on REJECTED verdict ─────────────────────────────────────
+      - name: Fail workflow if violations were confirmed
+        if: >
+          (steps.bob_review.outputs.bob_exit != '' && steps.bob_review.outputs.bob_exit != '0') ||
+          steps.python_review.outcome == 'failure'
+        run: |
+          echo "::error::StampBob: Confirmed invariant violations detected. PR is REJECTED."
+          echo "::error::Review the Stamp Card comment on the PR for details and remediations."
+          exit 1
