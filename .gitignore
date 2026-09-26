@@ -1,0 +1,61 @@
+# ============================================================
+# .gitignore — StampBob / IBM Hackathon
+# ============================================================
+
+# --- Sensitive Environment & Credential Files ---
+.env
+.env.*
+!.env.example
+ibmcloud-credentials.json
+*-credentials.json
+*credentials.json
+*secrets.yaml
+*secrets.yml
+
+# --- Cryptographic Key & Certificate Files ---
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cert
+
+# ============================================================
+# IMPORTANT: bob_sessions/ is a MANDATORY submission
+# deliverable and must NOT be ignored.
+# ============================================================
+# bob_sessions/   <-- intentionally NOT listed here
+
+# --- IDE Live Session Caches (excluded) ---
+.copilot/
+.cursor/
+.codeium/
+.idea/
+.vscode/
+
+# --- Python Build Artefacts ---
+__pycache__/
+*.py[cod]
+*.pyo
+.venv/
+venv/
+env/
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
+*.egg-info/
+dist/
+build/
+*.whl
+*.egg
+
+# --- OS Artefacts ---
+.DS_Store
+Thumbs.db
+
+# --- Jupyter ---
+.ipynb_checkpoints/
+
+# --- Logs ---
+*.log
+logs/

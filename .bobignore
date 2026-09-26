@@ -1,0 +1,51 @@
+# ============================================================
+# .bobignore — IBM Bob AI Assistant Security Boundaries
+# Prevents Bob from indexing, logging, or surfacing sensitive
+# credentials in session history or context windows.
+# ============================================================
+
+# --- IBM Cloud & WatsonX API Keys ---
+*IBM_CLOUD_API_KEY*
+*WATSON_*_API_KEY*
+*WATSONX_API_KEY*
+*API_KEY*
+
+# --- Access & Session Tokens ---
+*ACCESS_TOKEN*
+*SESSION_TOKEN*
+*REFRESH_TOKEN*
+*AUTH_TOKEN*
+*BEARER_TOKEN*
+
+# --- Secret Keys & Passwords ---
+*SECRET_KEY*
+*SECRET*
+*PASSWORD*
+*PASSWD*
+
+# --- Environment & Credential Files ---
+.env
+.env.*
+!.env.example
+*credentials.json
+ibmcloud-credentials.json
+*-credentials.json
+*secrets.yaml
+*secrets.yml
+
+# --- Cryptographic Key & Certificate Files ---
+*.pem
+*.key
+*.p12
+*.pfx
+*.crt
+*.cert
+
+# --- Database Connection Strings ---
+*DATABASE_URL*
+*DB_PASSWORD*
+*DB_URL*
+
+# --- Private Key / Service Account Files ---
+*service_account*.json
+*keyfile*.json
