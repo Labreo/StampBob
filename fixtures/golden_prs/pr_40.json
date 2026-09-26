@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-40",
+  "category": "NIL_DEREF",
+  "title": "Trace exporter dereferences optional span parent without guard",
+  "diff_content": "diff --git a/internal/trace/exporter.go b/internal/trace/exporter.go\n--- a/internal/trace/exporter.go\n+++ b/internal/trace/exporter.go\n@@ -9,0 +9,4 @@ func (e *Exporter) Export(span *Span) {\n+\t// Parent is nil for root spans\n+\tparentID := span.Parent.TraceID\n+\te.sink.Record(parentID, span.Name)\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "nil-check-boundary"
+  ],
+  "golden_repro_snippet": "func TestReproNilDeref(t *testing.T) {\n\tvar recovered interface{}\n\tfunc() {\n\t\tdefer func() { recovered = recover() }()\n\t\tvar parent *SpanContext\n\t\t_ = parent.TraceID\n\t}()\n\tif recovered == nil { t.Fatal(\"expected nil dereference panic\") }\n}"
+}

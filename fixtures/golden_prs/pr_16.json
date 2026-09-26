@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-16",
+  "category": "GOROUTINE_LEAK",
+  "title": "Add streaming response handler with uncancellable goroutine",
+  "diff_content": "diff --git a/internal/api/stream.go b/internal/api/stream.go\n--- a/internal/api/stream.go\n+++ b/internal/api/stream.go\n@@ -11,0 +11,7 @@ func StreamHandler(w http.ResponseWriter, r *http.Request) {\n+\tgo func() {\n+\t\tfor chunk := range source {\n+\t\t\tw.Write(chunk)\n+\t\t}\n+\t}()\n+\tw.WriteHeader(http.StatusOK)\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "goroutine-leak"
+  ],
+  "golden_repro_snippet": "func TestReproLeak(t *testing.T) {\n\tbaseline := liveGoroutines()\n\tsource := make(chan []byte) // never closed\n\tStreamHandler(httptest.NewRecorder(), httptest.NewRequest(\"GET\", \"/\", nil))\n\ttime.Sleep(50 * time.Millisecond)\n\tif liveGoroutines() <= baseline { t.Fatal(\"goroutine leaked on open channel\") }\n}"
+}

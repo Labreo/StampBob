@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-34",
+  "category": "NIL_DEREF",
+  "title": "Order service reads shipping address fields without nil check",
+  "diff_content": "diff --git a/internal/order/service.go b/internal/order/service.go\n--- a/internal/order/service.go\n+++ b/internal/order/service.go\n@@ -16,0 +16,5 @@ func (s *OrderService) Process(order *Order) error {\n+\taddr := order.ShippingAddress // may be nil for digital goods\n+\t// Missing: if addr == nil { return ErrNoAddress }\n+\tif addr.City == \"\" {\n+\t\treturn ErrInvalidAddress\n+\t}\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "nil-check-boundary"
+  ],
+  "golden_repro_snippet": "func TestReproNilDeref(t *testing.T) {\n\tvar recovered interface{}\n\tfunc() {\n\t\tdefer func() { recovered = recover() }()\n\t\tvar addr *Address\n\t\t_ = addr.City\n\t}()\n\tif recovered == nil { t.Fatal(\"expected nil dereference panic\") }\n}"
+}

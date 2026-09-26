@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-23",
+  "category": "UNBUFFERED_CHANNEL",
+  "title": "Fan-out processor allocates one channel per message in range loop",
+  "diff_content": "diff --git a/internal/fanout/processor.go b/internal/fanout/processor.go\n--- a/internal/fanout/processor.go\n+++ b/internal/fanout/processor.go\n@@ -6,0 +6,7 @@ func FanOut(msgs []Message, workers int) {\n+\tfor _, msg := range msgs {\n+\t\tch := make(chan Message)\n+\t\tfor w := 0; w < workers; w++ {\n+\t\t\tgo process(ch)\n+\t\t}\n+\t\tch <- msg\n+\t}\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "unbuffered-channel-in-loop"
+  ],
+  "golden_repro_snippet": "func TestReproUnbufferedDeadlock(t *testing.T) {\n\tch := make(chan Message)\n\tdone := make(chan struct{})\n\tgo func() { ch <- Message{}; close(done) }()\n\tselect {\n\tcase <-done: t.Fatal(\"expected blocking\")\n\tcase <-time.After(200 * time.Millisecond):\n\t}\n}"
+}

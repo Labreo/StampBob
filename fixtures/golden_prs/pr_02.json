@@ -1,0 +1,9 @@
+{
+  "pr_id": "PR-02",
+  "category": "CLEAN",
+  "title": "Add pagination support to ListUsers endpoint",
+  "diff_content": "diff --git a/internal/service/user.go b/internal/service/user.go\n--- a/internal/service/user.go\n+++ b/internal/service/user.go\n@@ -20,6 +20,10 @@ func (s *UserService) ListUsers(ctx context.Context, req ListRequest) ([]User, e\n+\tif req.PageSize <= 0 {\n+\t\treq.PageSize = 20\n+\t}\n+\toffset := req.Page * req.PageSize\n \trows, err := s.db.QueryContext(ctx, listUsersSQL, req.PageSize, offset)\n",
+  "expected_verdict": "APPROVED",
+  "expected_rules": [],
+  "golden_repro_snippet": "// No defect \u2014 APPROVED"
+}

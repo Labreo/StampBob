@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-12",
+  "category": "GOROUTINE_LEAK",
+  "title": "Spawn per-request background audit logger",
+  "diff_content": "diff --git a/internal/audit/logger.go b/internal/audit/logger.go\n--- a/internal/audit/logger.go\n+++ b/internal/audit/logger.go\n@@ -9,0 +9,6 @@ func (l *Logger) LogAsync(event AuditEvent) {\n+\tgo func() {\n+\t\tl.store.Save(event)\n+\t}()\n+}\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "goroutine-leak"
+  ],
+  "golden_repro_snippet": "func TestReproLeak(t *testing.T) {\n\tbaseline := liveGoroutines()\n\tl := &Logger{store: &blockingStore{}}\n\tfor i := 0; i < 5; i++ { l.LogAsync(AuditEvent{}) }\n\ttime.Sleep(50 * time.Millisecond)\n\tif liveGoroutines() <= baseline { t.Fatal(\"goroutines leaked\") }\n}"
+}

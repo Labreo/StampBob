@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-36",
+  "category": "NIL_DEREF",
+  "title": "gRPC interceptor reads request metadata without nil guard",
+  "diff_content": "diff --git a/internal/grpc/interceptor.go b/internal/grpc/interceptor.go\n--- a/internal/grpc/interceptor.go\n+++ b/internal/grpc/interceptor.go\n@@ -12,0 +12,5 @@ func AuthInterceptor(ctx context.Context, req interface{}, info *grpc.UnaryServerInfo, handler grpc.UnaryHandler) (interface{}, error) {\n+\tmd, _ := metadata.FromIncomingContext(ctx)\n+\t// md may be nil \u2014 no nil guard\n+\ttoken := md[\"authorization\"][0]\n+\tif !validateToken(token) {\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "nil-check-boundary"
+  ],
+  "golden_repro_snippet": "func TestReproNilDeref(t *testing.T) {\n\tvar recovered interface{}\n\tfunc() {\n\t\tdefer func() { recovered = recover() }()\n\t\tvar md metadata.MD // nil\n\t\t_ = md[\"authorization\"][0]\n\t}()\n\tif recovered == nil { t.Fatal(\"expected nil dereference panic\") }\n}"
+}

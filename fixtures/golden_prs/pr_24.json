@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-24",
+  "category": "UNBUFFERED_CHANNEL",
+  "title": "Add scatter-gather pipeline with unbuffered aggregation channels",
+  "diff_content": "diff --git a/pkg/pipeline/scatter.go b/pkg/pipeline/scatter.go\n--- a/pkg/pipeline/scatter.go\n+++ b/pkg/pipeline/scatter.go\n@@ -9,0 +9,7 @@ func Scatter(input []int) []chan int {\n+\tout := make([]chan int, len(input))\n+\tfor i, v := range input {\n+\t\tout[i] = make(chan int)\n+\t\tval := v\n+\t\tgo func() { out[i] <- val * 2 }()\n+\t}\n+\treturn out\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "unbuffered-channel-in-loop"
+  ],
+  "golden_repro_snippet": "func TestReproUnbufferedDeadlock(t *testing.T) {\n\tchans := Scatter([]int{1, 2, 3})\n\tdone := make(chan struct{})\n\tgo func() { <-chans[0]; close(done) }()\n\tselect {\n\tcase <-done:\n\tcase <-time.After(200 * time.Millisecond):\n\t\tt.Log(\"DEADLOCK REPRODUCED\")\n\t}\n}"
+}

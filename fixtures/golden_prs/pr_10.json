@@ -1,0 +1,9 @@
+{
+  "pr_id": "PR-10",
+  "category": "CLEAN",
+  "title": "Switch from sync.Mutex to RWMutex for read-heavy cache",
+  "diff_content": "diff --git a/pkg/cache/cache.go b/pkg/cache/cache.go\n--- a/pkg/cache/cache.go\n+++ b/pkg/cache/cache.go\n@@ -8,2 +8,2 @@ type Cache struct {\n-\tmu   sync.Mutex\n+\tmu   sync.RWMutex\n@@ -18,2 +18,2 @@ func (c *Cache) Get(key string) (interface{}, bool) {\n-\tc.mu.Lock()\n-\tdefer c.mu.Unlock()\n+\tc.mu.RLock()\n+\tdefer c.mu.RUnlock()\n",
+  "expected_verdict": "APPROVED",
+  "expected_rules": [],
+  "golden_repro_snippet": "// No defect \u2014 APPROVED"
+}

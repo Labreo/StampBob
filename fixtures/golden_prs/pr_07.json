@@ -1,0 +1,9 @@
+{
+  "pr_id": "PR-07",
+  "category": "CLEAN",
+  "title": "Add graceful shutdown with context cancellation to gRPC server",
+  "diff_content": "diff --git a/cmd/server/main.go b/cmd/server/main.go\n--- a/cmd/server/main.go\n+++ b/cmd/server/main.go\n@@ -22,0 +22,12 @@\n+\tctx, cancel := signal.NotifyContext(context.Background(), os.Interrupt)\n+\tdefer cancel()\n+\n+\tgo func() {\n+\t\t<-ctx.Done()\n+\t\tgrpcServer.GracefulStop()\n+\t}()\n+\n+\tif err := grpcServer.Serve(lis); err != nil {\n+\t\tlog.Fatalf(\"serve: %v\", err)\n+\t}\n",
+  "expected_verdict": "APPROVED",
+  "expected_rules": [],
+  "golden_repro_snippet": "// No defect \u2014 APPROVED"
+}

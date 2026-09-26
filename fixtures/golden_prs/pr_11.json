@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-11",
+  "category": "GOROUTINE_LEAK",
+  "title": "Add async background metric collector",
+  "diff_content": "diff --git a/pkg/worker.go b/pkg/worker.go\n--- a/pkg/worker.go\n+++ b/pkg/worker.go\n@@ -14,0 +14,7 @@ func StartMetricCollector(cfg Config) {\n+\tgo func() {\n+\t\tfor {\n+\t\t\tcollectMetrics(cfg.Endpoint)\n+\t\t\ttime.Sleep(cfg.Interval)\n+\t\t}\n+\t}()\n+}\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "goroutine-leak"
+  ],
+  "golden_repro_snippet": "func TestReproLeak(t *testing.T) {\n\tbaseline := liveGoroutines()\n\tStartMetricCollector(Config{Interval: time.Hour, Endpoint: \"http://x\"})\n\ttime.Sleep(50 * time.Millisecond)\n\tif liveGoroutines() <= baseline {\n\t\tt.Fatal(\"goroutine leak not reproduced\")\n\t}\n}"
+}

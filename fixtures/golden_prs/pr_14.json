@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-14",
+  "category": "GOROUTINE_LEAK",
+  "title": "Add background event subscriber without lifecycle management",
+  "diff_content": "diff --git a/internal/events/subscriber.go b/internal/events/subscriber.go\n--- a/internal/events/subscriber.go\n+++ b/internal/events/subscriber.go\n@@ -7,0 +7,8 @@ func Subscribe(broker EventBroker, handler Handler) {\n+\tgo func() {\n+\t\tfor msg := range broker.Messages() {\n+\t\t\thandler.Handle(msg)\n+\t\t}\n+\t}()\n+}\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "goroutine-leak"
+  ],
+  "golden_repro_snippet": "func TestReproLeak(t *testing.T) {\n\tbaseline := liveGoroutines()\n\tb := NewInfiniteTestBroker()\n\tSubscribe(b, NoopHandler{})\n\ttime.Sleep(50 * time.Millisecond)\n\tif liveGoroutines() <= baseline { t.Fatal(\"goroutine leaked\") }\n}"
+}

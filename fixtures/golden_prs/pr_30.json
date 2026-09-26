@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-30",
+  "category": "UNBUFFERED_CHANNEL",
+  "title": "Data pipeline stage creates per-record unbuffered output channel",
+  "diff_content": "diff --git a/pkg/pipeline/stage.go b/pkg/pipeline/stage.go\n--- a/pkg/pipeline/stage.go\n+++ b/pkg/pipeline/stage.go\n@@ -8,0 +8,7 @@ func ProcessRecords(records []Record) {\n+\tfor _, r := range records {\n+\t\toutCh := make(chan Record)\n+\t\trecord := r\n+\t\tgo func() {\n+\t\t\toutCh <- transform(record)\n+\t\t}()\n+\t}\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "unbuffered-channel-in-loop"
+  ],
+  "golden_repro_snippet": "func TestReproUnbufferedDeadlock(t *testing.T) {\n\tch := make(chan Record)\n\tdone := make(chan struct{})\n\tgo func() { ch <- Record{}; close(done) }()\n\tselect {\n\tcase <-done: t.Fatal(\"expected blocking send\")\n\tcase <-time.After(200 * time.Millisecond):\n\t\tt.Log(\"unbuffered channel deadlock confirmed\")\n\t}\n}"
+}

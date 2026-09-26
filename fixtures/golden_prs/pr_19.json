@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-19",
+  "category": "GOROUTINE_LEAK",
+  "title": "Add notification sender goroutine without stop signal",
+  "diff_content": "diff --git a/internal/notify/sender.go b/internal/notify/sender.go\n--- a/internal/notify/sender.go\n+++ b/internal/notify/sender.go\n@@ -9,0 +9,7 @@ func (s *Sender) RunAsync() {\n+\tgo func() {\n+\t\tfor {\n+\t\t\ts.flush()\n+\t\t\ttime.Sleep(s.interval)\n+\t\t}\n+\t}()\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "goroutine-leak"
+  ],
+  "golden_repro_snippet": "func TestReproLeak(t *testing.T) {\n\tbaseline := liveGoroutines()\n\ts := &Sender{interval: time.Hour}\n\ts.RunAsync()\n\ttime.Sleep(50 * time.Millisecond)\n\tif liveGoroutines() <= baseline { t.Fatal(\"sender goroutine leaked\") }\n}"
+}

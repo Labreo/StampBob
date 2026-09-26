@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-39",
+  "category": "NIL_DEREF",
+  "title": "Session middleware reads user object from context without nil check",
+  "diff_content": "diff --git a/internal/middleware/session.go b/internal/middleware/session.go\n--- a/internal/middleware/session.go\n+++ b/internal/middleware/session.go\n@@ -10,0 +10,5 @@ func SessionMiddleware(next http.Handler) http.Handler {\n+\treturn http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {\n+\t\tuser := r.Context().Value(userKey).(*User) // panics if key absent (nil assertion)\n+\t\tlog.Printf(\"user: %s\", user.Email)\n+\t\tnext.ServeHTTP(w, r)\n+\t})\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "nil-check-boundary"
+  ],
+  "golden_repro_snippet": "func TestReproNilDeref(t *testing.T) {\n\tvar recovered interface{}\n\tfunc() {\n\t\tdefer func() { recovered = recover() }()\n\t\tvar u *User\n\t\t_ = u.Email\n\t}()\n\tif recovered == nil { t.Fatal(\"expected nil dereference panic\") }\n}"
+}

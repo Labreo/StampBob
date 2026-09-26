@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-46",
+  "category": "OTEL_OMISSION",
+  "title": "Add search service RPC with proprietary span attribute namespace",
+  "diff_content": "diff --git a/internal/search/handler.go b/internal/search/handler.go\n--- a/internal/search/handler.go\n+++ b/internal/search/handler.go\n@@ -10,0 +10,9 @@ func (h *SearchHandler) Query(ctx context.Context, req *SearchRequest) (*SearchResponse, error) {\n+\tctx, span := tracer.Start(ctx, \"search.query\")\n+\tdefer span.End()\n+\tspan.SetAttributes(\n+\t\tattribute.String(\"search.query_text\", req.Query),\n+\t\tattribute.Int(\"search.result_count\", req.MaxResults),\n+\t)\n+\treturn h.engine.Search(ctx, req)\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "otel-semantic-convention"
+  ],
+  "golden_repro_snippet": "def test_repro_otel_omission():\n    exporter = InMemorySpanExporter()\n    provider = TracerProvider()\n    provider.add_span_processor(SimpleSpanProcessor(exporter))\n    tracer = provider.get_tracer(\"repro\")\n    with tracer.start_as_current_span(\"search.query\") as span:\n        span.set_attribute(\"search.query_text\", \"golang channels\")\n    attrs = dict(exporter.get_finished_spans()[0].attributes)\n    approved_prefixes = {\"gen_ai\",\"server\",\"client\",\"http\",\"rpc\",\"db\",\"messaging\"}\n    assert not any(\"search.query_text\".startswith(p) for p in approved_prefixes), \"otel semconv violation confirmed\"\n"
+}

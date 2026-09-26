@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-17",
+  "category": "GOROUTINE_LEAK",
+  "title": "Add rate-limiter background token refill without stop channel",
+  "diff_content": "diff --git a/pkg/ratelimit/limiter.go b/pkg/ratelimit/limiter.go\n--- a/pkg/ratelimit/limiter.go\n+++ b/pkg/ratelimit/limiter.go\n@@ -18,0 +18,8 @@ func NewLimiter(rate int) *Limiter {\n+\tgo func() {\n+\t\tticker := time.NewTicker(time.Second)\n+\t\tfor range ticker.C {\n+\t\t\tl.refill(rate)\n+\t\t}\n+\t}()\n+\treturn l\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "goroutine-leak"
+  ],
+  "golden_repro_snippet": "func TestReproLeak(t *testing.T) {\n\tbaseline := liveGoroutines()\n\t_ = NewLimiter(10)\n\ttime.Sleep(50 * time.Millisecond)\n\tif liveGoroutines() <= baseline { t.Fatal(\"ticker goroutine leaked\") }\n}"
+}

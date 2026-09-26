@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-22",
+  "category": "UNBUFFERED_CHANNEL",
+  "title": "Worker pool dispatcher creates per-task unbuffered result channels",
+  "diff_content": "diff --git a/internal/pool/dispatcher.go b/internal/pool/dispatcher.go\n--- a/internal/pool/dispatcher.go\n+++ b/internal/pool/dispatcher.go\n@@ -8,0 +8,6 @@ func Dispatch(tasks []Task) []chan error {\n+\tresults := make([]chan error, len(tasks))\n+\tfor i, t := range tasks {\n+\t\tresults[i] = make(chan error)\n+\t\tgo execute(t, results[i])\n+\t}\n+\treturn results\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "unbuffered-channel-in-loop"
+  ],
+  "golden_repro_snippet": "func TestReproUnbufferedDeadlock(t *testing.T) {\n\tresults := Dispatch(make([]Task, 3))\n\tdone := make(chan struct{})\n\tgo func() { <-results[0]; close(done) }()\n\tselect {\n\tcase <-done:\n\tcase <-time.After(200 * time.Millisecond):\n\t\tt.Log(\"DEADLOCK REPRODUCED: unbuffered send blocked\")\n\t}\n}"
+}

@@ -1,0 +1,9 @@
+{
+  "pr_id": "PR-05",
+  "category": "CLEAN",
+  "title": "Extract database retry logic into helper with context propagation",
+  "diff_content": "diff --git a/internal/db/retry.go b/internal/db/retry.go\n--- /dev/null\n+++ b/internal/db/retry.go\n@@ -0,0 +1,22 @@\n+package db\n+\n+import (\n+\t\"context\"\n+\t\"time\"\n+)\n+\n+func WithRetry(ctx context.Context, attempts int, fn func() error) error {\n+\tvar err error\n+\tfor i := 0; i < attempts; i++ {\n+\t\tif err = fn(); err == nil {\n+\t\t\treturn nil\n+\t\t}\n+\t\tselect {\n+\t\tcase <-ctx.Done():\n+\t\t\treturn ctx.Err()\n+\t\tcase <-time.After(time.Duration(i+1) * 100 * time.Millisecond):\n+\t\t}\n+\t}\n+\treturn err\n+}\n",
+  "expected_verdict": "APPROVED",
+  "expected_rules": [],
+  "golden_repro_snippet": "// No defect \u2014 APPROVED"
+}

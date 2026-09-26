@@ -1,0 +1,9 @@
+{
+  "pr_id": "PR-06",
+  "category": "CLEAN",
+  "title": "Upgrade TLS minimum version to 1.3 in server config",
+  "diff_content": "diff --git a/internal/server/tls.go b/internal/server/tls.go\n--- a/internal/server/tls.go\n+++ b/internal/server/tls.go\n@@ -8,2 +8,2 @@ func tlsConfig() *tls.Config {\n-\tMinVersion: tls.VersionTLS12,\n+\tMinVersion: tls.VersionTLS13,\n",
+  "expected_verdict": "APPROVED",
+  "expected_rules": [],
+  "golden_repro_snippet": "// No defect \u2014 APPROVED"
+}

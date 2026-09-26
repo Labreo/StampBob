@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-28",
+  "category": "UNBUFFERED_CHANNEL",
+  "title": "Add report generator with per-section unbuffered channel in range",
+  "diff_content": "diff --git a/pkg/report/generator.go b/pkg/report/generator.go\n--- a/pkg/report/generator.go\n+++ b/pkg/report/generator.go\n@@ -7,0 +7,7 @@ func GenerateSections(sections []Section) []string {\n+\toutputs := make([]chan string, len(sections))\n+\tfor i, s := range sections {\n+\t\toutputs[i] = make(chan string)\n+\t\tgo func(sec Section) { outputs[i] <- render(sec) }(s)\n+\t}\n+\treturn nil // forgot to drain\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "unbuffered-channel-in-loop"
+  ],
+  "golden_repro_snippet": "func TestReproUnbufferedDeadlock(t *testing.T) {\n\tch := make(chan string)\n\tdone := make(chan struct{})\n\tgo func() { ch <- \"section\"; close(done) }()\n\tselect {\n\tcase <-done: t.Fatal(\"expected deadlock\")\n\tcase <-time.After(200 * time.Millisecond):\n\t\tt.Log(\"unbuffered channel send confirmed blocked\")\n\t}\n}"
+}

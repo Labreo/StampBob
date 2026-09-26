@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-48",
+  "category": "OTEL_OMISSION",
+  "title": "Add analytics event RPC endpoint with non-standard span keys",
+  "diff_content": "diff --git a/internal/analytics/handler.go b/internal/analytics/handler.go\n--- a/internal/analytics/handler.go\n+++ b/internal/analytics/handler.go\n@@ -10,0 +10,9 @@ func (h *AnalyticsHandler) Track(ctx context.Context, req *TrackRequest) error {\n+\tctx, span := tracer.Start(ctx, \"analytics.track\")\n+\tdefer span.End()\n+\tspan.SetAttributes(\n+\t\tattribute.String(\"analytics.event_name\", req.EventName),\n+\t\tattribute.String(\"analytics.user_segment\", req.Segment),\n+\t)\n+\treturn h.sink.Emit(ctx, req)\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "otel-semantic-convention"
+  ],
+  "golden_repro_snippet": "def test_repro_otel_omission():\n    exporter = InMemorySpanExporter()\n    provider = TracerProvider()\n    provider.add_span_processor(SimpleSpanProcessor(exporter))\n    tracer = provider.get_tracer(\"repro\")\n    with tracer.start_as_current_span(\"analytics.track\") as span:\n        span.set_attribute(\"analytics.event_name\", \"page_view\")\n    attrs = dict(exporter.get_finished_spans()[0].attributes)\n    approved = {\"gen_ai\",\"server\",\"client\",\"http\",\"rpc\",\"db\",\"faas\"}\n    assert not any(\"analytics.event_name\".startswith(p) for p in approved), \"otel semconv violation confirmed\"\n"
+}

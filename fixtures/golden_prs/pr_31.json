@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-31",
+  "category": "NIL_DEREF",
+  "title": "Add user profile loader without nil guard on DB result",
+  "diff_content": "diff --git a/internal/service/profile.go b/internal/service/profile.go\n--- a/internal/service/profile.go\n+++ b/internal/service/profile.go\n@@ -10,0 +10,5 @@ func (s *Service) GetProfile(ctx context.Context, userID string) (*Profile, error) {\n+\tuser, _ := s.db.FindUser(ctx, userID)\n+\t// Missing nil check \u2014 user may be nil when not found\n+\treturn &Profile{Name: user.Name, Email: user.Email}, nil\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "nil-check-boundary"
+  ],
+  "golden_repro_snippet": "func TestReproNilDeref(t *testing.T) {\n\tvar recovered interface{}\n\tfunc() {\n\t\tdefer func() { recovered = recover() }()\n\t\tvar user *User // nil\n\t\t_ = user.Name // panics\n\t}()\n\tif recovered == nil { t.Fatal(\"expected nil dereference panic\") }\n\tt.Logf(\"NIL DEREFERENCE REPRODUCED: %v\", recovered)\n}"
+}

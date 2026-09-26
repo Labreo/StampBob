@@ -1,0 +1,9 @@
+{
+  "pr_id": "PR-04",
+  "category": "CLEAN",
+  "title": "Add unit tests for config parser edge cases",
+  "diff_content": "diff --git a/pkg/config/parser_test.go b/pkg/config/parser_test.go\n--- /dev/null\n+++ b/pkg/config/parser_test.go\n@@ -0,0 +1,28 @@\n+package config_test\n+\n+import (\n+\t\"testing\"\n+\t\"github.com/example/app/pkg/config\"\n+)\n+\n+func TestParseEmptyFile(t *testing.T) {\n+\t_, err := config.ParseFile(\"\")\n+\tif err == nil {\n+\t\tt.Fatal(\"expected error for empty path\")\n+\t}\n+}\n+\n+func TestParseValidConfig(t *testing.T) {\n+\tcfg, err := config.ParseFile(\"testdata/valid.yaml\")\n+\tif err != nil {\n+\t\tt.Fatalf(\"unexpected error: %v\", err)\n+\t}\n+\tif cfg.Port != 8080 {\n+\t\tt.Errorf(\"expected port 8080, got %d\", cfg.Port)\n+\t}\n+}\n",
+  "expected_verdict": "APPROVED",
+  "expected_rules": [],
+  "golden_repro_snippet": "// No defect \u2014 APPROVED"
+}

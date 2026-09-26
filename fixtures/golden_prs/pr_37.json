@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-37",
+  "category": "NIL_DEREF",
+  "title": "Plugin loader calls methods on optionally-registered plugin",
+  "diff_content": "diff --git a/pkg/plugin/loader.go b/pkg/plugin/loader.go\n--- a/pkg/plugin/loader.go\n+++ b/pkg/plugin/loader.go\n@@ -9,0 +9,4 @@ func (l *Loader) Run(name string) error {\n+\tp := l.registry[name] // returns nil (zero value) if not registered\n+\t// Missing: if p == nil { return ErrNotFound }\n+\treturn p.Execute()\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "nil-check-boundary"
+  ],
+  "golden_repro_snippet": "func TestReproNilDeref(t *testing.T) {\n\tvar recovered interface{}\n\tfunc() {\n\t\tdefer func() { recovered = recover() }()\n\t\tvar p Plugin // nil interface\n\t\t_ = p.Execute()\n\t}()\n\tif recovered == nil { t.Fatal(\"expected nil dereference panic\") }\n}"
+}

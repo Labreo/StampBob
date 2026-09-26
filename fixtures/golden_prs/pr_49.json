@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-49",
+  "category": "OTEL_OMISSION",
+  "title": "Add recommendation engine RPC with missing rpc.service attribute",
+  "diff_content": "diff --git a/internal/recommend/handler.go b/internal/recommend/handler.go\n--- a/internal/recommend/handler.go\n+++ b/internal/recommend/handler.go\n@@ -10,0 +10,9 @@ func (h *RecommendHandler) Suggest(ctx context.Context, req *SuggestRequest) (*SuggestResponse, error) {\n+\tctx, span := tracer.Start(ctx, \"recommend.suggest\")\n+\tdefer span.End()\n+\tspan.SetAttributes(\n+\t\tattribute.String(\"recommend.user_id\", req.UserID),\n+\t\tattribute.Int(\"recommend.limit\", req.Limit),\n+\t)\n+\treturn h.engine.Suggest(ctx, req)\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "otel-semantic-convention"
+  ],
+  "golden_repro_snippet": "def test_repro_otel_omission():\n    exporter = InMemorySpanExporter()\n    provider = TracerProvider()\n    provider.add_span_processor(SimpleSpanProcessor(exporter))\n    tracer = provider.get_tracer(\"repro\")\n    with tracer.start_as_current_span(\"recommend.suggest\") as span:\n        span.set_attribute(\"recommend.user_id\", \"u-001\")\n    attrs = dict(exporter.get_finished_spans()[0].attributes)\n    approved = {\"gen_ai\",\"server\",\"client\",\"http\",\"rpc\",\"db\"}\n    assert not any(\"recommend.user_id\".startswith(p) for p in approved), \"otel semconv violation confirmed\"\n"
+}

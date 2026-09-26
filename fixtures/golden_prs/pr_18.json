@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-18",
+  "category": "GOROUTINE_LEAK",
+  "title": "Queue processor spawns goroutine without WaitGroup tracking",
+  "diff_content": "diff --git a/internal/queue/processor.go b/internal/queue/processor.go\n--- a/internal/queue/processor.go\n+++ b/internal/queue/processor.go\n@@ -12,0 +12,6 @@ func (p *Processor) Dispatch(job Job) {\n+\tgo func() {\n+\t\tp.execute(job)\n+\t}()\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "goroutine-leak"
+  ],
+  "golden_repro_snippet": "func TestReproLeak(t *testing.T) {\n\tbaseline := liveGoroutines()\n\tp := &Processor{execute: func(j Job) { time.Sleep(time.Hour) }}\n\tp.Dispatch(Job{})\n\ttime.Sleep(50 * time.Millisecond)\n\tif liveGoroutines() <= baseline { t.Fatal(\"dispatch goroutine leaked\") }\n}"
+}

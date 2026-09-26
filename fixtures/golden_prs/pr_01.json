@@ -1,0 +1,9 @@
+{
+  "pr_id": "PR-01",
+  "category": "CLEAN",
+  "title": "Refactor HTTP handler to use structured logging",
+  "diff_content": "diff --git a/internal/api/handler.go b/internal/api/handler.go\n--- a/internal/api/handler.go\n+++ b/internal/api/handler.go\n@@ -12,7 +12,9 @@ func (h *Handler) ServeHTTP(w http.ResponseWriter, r *http.Request) {\n-\tlog.Printf(\"request: %s %s\", r.Method, r.URL.Path)\n+\th.logger.Info(\"request received\",\n+\t\t\"method\", r.Method,\n+\t\t\"path\", r.URL.Path,\n+\t)\n }\n",
+  "expected_verdict": "APPROVED",
+  "expected_rules": [],
+  "golden_repro_snippet": "// No defect \u2014 APPROVED"
+}

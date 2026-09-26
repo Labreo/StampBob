@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-41",
+  "category": "OTEL_OMISSION",
+  "title": "Add gRPC ProductService.GetProduct endpoint without rpc.* span attributes",
+  "diff_content": "diff --git a/internal/rpc/product_handler.go b/internal/rpc/product_handler.go\n--- a/internal/rpc/product_handler.go\n+++ b/internal/rpc/product_handler.go\n@@ -9,0 +9,10 @@ func (h *Handler) GetProduct(ctx context.Context, req *pb.GetProductRequest) (*pb.Product, error) {\n+\tctx, span := tracer.Start(ctx, \"ProductService.GetProduct\")\n+\tdefer span.End()\n+\tspan.SetAttributes(\n+\t\tattribute.String(\"custom.product_id\", req.ProductId),\n+\t)\n+\tp, err := h.store.Get(ctx, req.ProductId)\n+\tif err != nil {\n+\t\treturn nil, err\n+\t}\n+\treturn p.ToProto(), nil\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "otel-semantic-convention"
+  ],
+  "golden_repro_snippet": "def test_repro_otel_omission():\n    exporter = InMemorySpanExporter()\n    provider = TracerProvider()\n    provider.add_span_processor(SimpleSpanProcessor(exporter))\n    tracer = provider.get_tracer(\"repro\")\n    with tracer.start_as_current_span(\"GetProduct\") as span:\n        span.set_attribute(\"custom.product_id\", \"p-123\")\n    attrs = dict(exporter.get_finished_spans()[0].attributes)\n    assert not any(k.startswith((\"rpc.\", \"server.\")) for k in attrs), \"otel semconv violation confirmed\"\n"
+}

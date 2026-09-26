@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-43",
+  "category": "OTEL_OMISSION",
+  "title": "Add AI inference RPC handler with missing gen_ai.* span attributes",
+  "diff_content": "diff --git a/internal/ai/infer_handler.go b/internal/ai/infer_handler.go\n--- a/internal/ai/infer_handler.go\n+++ b/internal/ai/infer_handler.go\n@@ -10,0 +10,9 @@ func (h *InferHandler) Infer(ctx context.Context, req *InferRequest) (*InferResponse, error) {\n+\tctx, span := tracer.Start(ctx, \"ai.infer\")\n+\tdefer span.End()\n+\tspan.SetAttributes(\n+\t\tattribute.String(\"model.name\", req.ModelID),\n+\t\tattribute.Int(\"inference.token_count\", req.MaxTokens),\n+\t)\n+\treturn h.model.Run(ctx, req)\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "otel-semantic-convention"
+  ],
+  "golden_repro_snippet": "def test_repro_otel_omission():\n    exporter = InMemorySpanExporter()\n    provider = TracerProvider()\n    provider.add_span_processor(SimpleSpanProcessor(exporter))\n    tracer = provider.get_tracer(\"repro\")\n    with tracer.start_as_current_span(\"ai.infer\") as span:\n        span.set_attribute(\"model.name\", \"gpt-4\")\n    attrs = dict(exporter.get_finished_spans()[0].attributes)\n    assert \"model.name\" in attrs\n    assert not attrs.get(\"model.name\", \"\").startswith(\"gen_ai.\"), \"otel semconv violation confirmed\"\n"
+}

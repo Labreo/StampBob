@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-27",
+  "category": "UNBUFFERED_CHANNEL",
+  "title": "Add concurrent health checker with per-host unbuffered result channel",
+  "diff_content": "diff --git a/internal/health/checker.go b/internal/health/checker.go\n--- a/internal/health/checker.go\n+++ b/internal/health/checker.go\n@@ -8,0 +8,7 @@ func CheckAll(hosts []string) []bool {\n+\tresults := make([]chan bool, len(hosts))\n+\tfor i, h := range hosts {\n+\t\tresults[i] = make(chan bool)\n+\t\tgo func(host string) { results[i] <- ping(host) }(h)\n+\t}\n+\t// caller must drain \u2014 but nobody will\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "unbuffered-channel-in-loop"
+  ],
+  "golden_repro_snippet": "func TestReproUnbufferedDeadlock(t *testing.T) {\n\tch := make(chan bool)\n\tdone := make(chan struct{})\n\tgo func() { ch <- true; close(done) }()\n\tselect {\n\tcase <-done: t.Fatal(\"should have blocked\")\n\tcase <-time.After(200 * time.Millisecond):\n\t}\n}"
+}

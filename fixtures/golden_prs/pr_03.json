@@ -1,0 +1,9 @@
+{
+  "pr_id": "PR-03",
+  "category": "CLEAN",
+  "title": "Replace magic numbers with named constants in scheduler",
+  "diff_content": "diff --git a/pkg/scheduler/scheduler.go b/pkg/scheduler/scheduler.go\n--- a/pkg/scheduler/scheduler.go\n+++ b/pkg/scheduler/scheduler.go\n@@ -5,0 +5,5 @@\n+const (\n+\tdefaultWorkers    = 8\n+\tdefaultQueueDepth = 256\n+\tdefaultRetryDelay = 5 * time.Second\n+)\n@@ -18,3 +23,3 @@ func New() *Scheduler {\n-\ts.workers = 8\n-\ts.queue = make(chan Job, 256)\n+\ts.workers = defaultWorkers\n+\ts.queue = make(chan Job, defaultQueueDepth)\n",
+  "expected_verdict": "APPROVED",
+  "expected_rules": [],
+  "golden_repro_snippet": "// No defect \u2014 APPROVED"
+}

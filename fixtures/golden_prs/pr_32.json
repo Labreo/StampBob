@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-32",
+  "category": "NIL_DEREF",
+  "title": "Add config loader that dereferences optional nested struct",
+  "diff_content": "diff --git a/pkg/config/loader.go b/pkg/config/loader.go\n--- a/pkg/config/loader.go\n+++ b/pkg/config/loader.go\n@@ -14,0 +14,4 @@ func Load(path string) (*AppConfig, error) {\n+\tcfg, _ := parse(path)\n+\t// cfg.Database may be nil when section is absent\n+\treturn cfg, fmt.Errorf(\"invalid dsn: %s\", cfg.Database.DSN)\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "nil-check-boundary"
+  ],
+  "golden_repro_snippet": "func TestReproNilDeref(t *testing.T) {\n\tvar recovered interface{}\n\tfunc() {\n\t\tdefer func() { recovered = recover() }()\n\t\tvar cfg *AppConfig\n\t\t_ = cfg.Database.DSN\n\t}()\n\tif recovered == nil { t.Fatal(\"expected panic\") }\n}"
+}

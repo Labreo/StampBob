@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-21",
+  "category": "UNBUFFERED_CHANNEL",
+  "title": "Add parallel download manager with per-item channels",
+  "diff_content": "diff --git a/pkg/downloader/manager.go b/pkg/downloader/manager.go\n--- a/pkg/downloader/manager.go\n+++ b/pkg/downloader/manager.go\n@@ -10,0 +10,8 @@ func (m *Manager) DownloadAll(urls []string) {\n+\tfor _, u := range urls {\n+\t\tch := make(chan Result)\n+\t\tgo func(url string) {\n+\t\t\tch <- m.fetch(url)\n+\t\t}(u)\n+\t}\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "unbuffered-channel-in-loop"
+  ],
+  "golden_repro_snippet": "func TestReproUnbufferedDeadlock(t *testing.T) {\n\tdone := make(chan struct{})\n\tch := make(chan Result) // no buffer\n\tgo func() { ch <- Result{}; close(done) }()\n\tselect {\n\tcase <-done: t.Fatal(\"expected blocking send\")\n\tcase <-time.After(200 * time.Millisecond): // deadlock confirmed\n\t}\n}"
+}

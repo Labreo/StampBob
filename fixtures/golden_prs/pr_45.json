@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-45",
+  "category": "OTEL_OMISSION",
+  "title": "Add file-upload endpoint with missing http.* semconv span attributes",
+  "diff_content": "diff --git a/internal/upload/handler.go b/internal/upload/handler.go\n--- a/internal/upload/handler.go\n+++ b/internal/upload/handler.go\n@@ -10,0 +10,9 @@ func (h *UploadHandler) Upload(w http.ResponseWriter, r *http.Request) {\n+\tctx, span := tracer.Start(r.Context(), \"upload.file\")\n+\tdefer span.End()\n+\tspan.SetAttributes(\n+\t\tattribute.String(\"upload.filename\", filename),\n+\t\tattribute.Int64(\"upload.bytes\", fileSize),\n+\t)\n+\th.store.Save(ctx, filename, data)\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "otel-semantic-convention"
+  ],
+  "golden_repro_snippet": "def test_repro_otel_omission():\n    exporter = InMemorySpanExporter()\n    provider = TracerProvider()\n    provider.add_span_processor(SimpleSpanProcessor(exporter))\n    tracer = provider.get_tracer(\"repro\")\n    with tracer.start_as_current_span(\"upload.file\") as span:\n        span.set_attribute(\"upload.filename\", \"doc.pdf\")\n    attrs = dict(exporter.get_finished_spans()[0].attributes)\n    assert \"upload.filename\" in attrs\n    assert not \"upload.filename\".startswith(\"http.\"), \"otel semconv violation confirmed\"\n"
+}

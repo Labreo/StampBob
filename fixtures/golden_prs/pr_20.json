@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-20",
+  "category": "GOROUTINE_LEAK",
+  "title": "Add webhook retry loop goroutine without context",
+  "diff_content": "diff --git a/internal/webhook/retrier.go b/internal/webhook/retrier.go\n--- a/internal/webhook/retrier.go\n+++ b/internal/webhook/retrier.go\n@@ -8,0 +8,10 @@ func (r *Retrier) RetryAsync(payload []byte) {\n+\tgo func() {\n+\t\tfor attempt := 0; attempt < r.maxAttempts; attempt++ {\n+\t\t\tif err := r.send(payload); err == nil {\n+\t\t\t\treturn\n+\t\t\t}\n+\t\t\ttime.Sleep(r.backoff)\n+\t\t}\n+\t}()\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "goroutine-leak"
+  ],
+  "golden_repro_snippet": "func TestReproLeak(t *testing.T) {\n\tbaseline := liveGoroutines()\n\tr := &Retrier{maxAttempts: 100, backoff: time.Hour, send: func([]byte) error { return errors.New(\"fail\") }}\n\tr.RetryAsync([]byte(\"ping\"))\n\ttime.Sleep(50 * time.Millisecond)\n\tif liveGoroutines() <= baseline { t.Fatal(\"retry goroutine leaked\") }\n}"
+}

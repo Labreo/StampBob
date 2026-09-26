@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-33",
+  "category": "NIL_DEREF",
+  "title": "Cache miss handler accesses Value field without nil guard",
+  "diff_content": "diff --git a/pkg/cache/accessor.go b/pkg/cache/accessor.go\n--- a/pkg/cache/accessor.go\n+++ b/pkg/cache/accessor.go\n@@ -8,0 +8,4 @@ func (c *Cache) MustGet(key string) interface{} {\n+\tentry := c.lookup(key) // returns nil on miss\n+\t// No nil guard \u2014 panics on cache miss\n+\treturn entry.Value\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "nil-check-boundary"
+  ],
+  "golden_repro_snippet": "func TestReproNilDeref(t *testing.T) {\n\tvar recovered interface{}\n\tfunc() {\n\t\tdefer func() { recovered = recover() }()\n\t\tvar entry *Entry\n\t\t_ = entry.Value\n\t}()\n\tif recovered == nil { t.Fatal(\"expected nil dereference panic\") }\n}"
+}

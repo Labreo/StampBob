@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-35",
+  "category": "NIL_DEREF",
+  "title": "Metrics reporter accesses optional label map without nil check",
+  "diff_content": "diff --git a/internal/metrics/reporter.go b/internal/metrics/reporter.go\n--- a/internal/metrics/reporter.go\n+++ b/internal/metrics/reporter.go\n@@ -9,0 +9,4 @@ func (r *Reporter) Emit(m *Metric) {\n+\t// Labels may be nil if metric was constructed without labels\n+\tfor k, v := range m.Labels {\n+\t\tr.sink.Tag(k, v)\n+\t}\n+\tr.sink.Count(m.Name, m.Labels[\"env\"]) // panics when Labels is nil\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "nil-check-boundary"
+  ],
+  "golden_repro_snippet": "func TestReproNilDeref(t *testing.T) {\n\tvar recovered interface{}\n\tfunc() {\n\t\tdefer func() { recovered = recover() }()\n\t\tvar m *Metric\n\t\t_ = m.Labels[\"env\"]\n\t}()\n\tif recovered == nil { t.Fatal(\"expected nil dereference panic\") }\n}"
+}

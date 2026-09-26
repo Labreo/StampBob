@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-47",
+  "category": "OTEL_OMISSION",
+  "title": "Add notification dispatch RPC without required rpc.method span attribute",
+  "diff_content": "diff --git a/internal/notify/rpc_handler.go b/internal/notify/rpc_handler.go\n--- a/internal/notify/rpc_handler.go\n+++ b/internal/notify/rpc_handler.go\n@@ -9,0 +9,9 @@ func (h *NotifyHandler) Send(ctx context.Context, req *SendRequest) (*SendResponse, error) {\n+\tctx, span := tracer.Start(ctx, \"notify.send\")\n+\tdefer span.End()\n+\tspan.SetAttributes(\n+\t\tattribute.String(\"notification.channel\", req.Channel),\n+\t\tattribute.String(\"notification.template_id\", req.TemplateID),\n+\t)\n+\treturn h.dispatcher.Send(ctx, req)\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "otel-semantic-convention"
+  ],
+  "golden_repro_snippet": "def test_repro_otel_omission():\n    exporter = InMemorySpanExporter()\n    provider = TracerProvider()\n    provider.add_span_processor(SimpleSpanProcessor(exporter))\n    tracer = provider.get_tracer(\"repro\")\n    with tracer.start_as_current_span(\"notify.send\") as span:\n        span.set_attribute(\"notification.channel\", \"email\")\n    attrs = dict(exporter.get_finished_spans()[0].attributes)\n    approved = {\"messaging\",\"rpc\",\"server\",\"http\"}\n    assert not any(\"notification.channel\".startswith(p) for p in approved), \"otel semconv violation confirmed\"\n"
+}

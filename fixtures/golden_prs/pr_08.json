@@ -1,0 +1,9 @@
+{
+  "pr_id": "PR-08",
+  "category": "CLEAN",
+  "title": "Rename internal metric field to follow snake_case convention",
+  "diff_content": "diff --git a/internal/metrics/collector.go b/internal/metrics/collector.go\n--- a/internal/metrics/collector.go\n+++ b/internal/metrics/collector.go\n@@ -14,4 +14,4 @@ type Collector struct {\n-\tRequestCount  int64\n-\tErrorCount    int64\n+\trequest_count  int64\n+\terror_count    int64\n",
+  "expected_verdict": "APPROVED",
+  "expected_rules": [],
+  "golden_repro_snippet": "// No defect \u2014 APPROVED"
+}

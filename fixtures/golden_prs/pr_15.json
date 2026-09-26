@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-15",
+  "category": "GOROUTINE_LEAK",
+  "title": "Introduce periodic health-ping goroutine in client pool",
+  "diff_content": "diff --git a/pkg/pool/client_pool.go b/pkg/pool/client_pool.go\n--- a/pkg/pool/client_pool.go\n+++ b/pkg/pool/client_pool.go\n@@ -22,0 +22,9 @@ func (p *Pool) Start() {\n+\tfor _, c := range p.clients {\n+\t\tclient := c\n+\t\tgo func() {\n+\t\t\tfor {\n+\t\t\t\tclient.Ping()\n+\t\t\t\ttime.Sleep(30 * time.Second)\n+\t\t\t}\n+\t\t}()\n+\t}\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "goroutine-leak"
+  ],
+  "golden_repro_snippet": "func TestReproLeak(t *testing.T) {\n\tbaseline := liveGoroutines()\n\tp := &Pool{clients: makeTestClients(3)}\n\tp.Start()\n\ttime.Sleep(50 * time.Millisecond)\n\tif liveGoroutines() <= baseline { t.Fatal(\"goroutines not leaked\") }\n}"
+}

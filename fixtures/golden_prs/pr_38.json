@@ -1,0 +1,11 @@
+{
+  "pr_id": "PR-38",
+  "category": "NIL_DEREF",
+  "title": "Payment processor dereferences optional discount pointer",
+  "diff_content": "diff --git a/internal/payment/processor.go b/internal/payment/processor.go\n--- a/internal/payment/processor.go\n+++ b/internal/payment/processor.go\n@@ -13,0 +13,4 @@ func (p *Processor) Total(cart *Cart) float64 {\n+\t// cart.Discount is nil when no promo code applied\n+\tdiscountPct := cart.Discount.Percentage\n+\treturn cart.Subtotal * (1 - discountPct/100)\n",
+  "expected_verdict": "REJECTED",
+  "expected_rules": [
+    "nil-check-boundary"
+  ],
+  "golden_repro_snippet": "func TestReproNilDeref(t *testing.T) {\n\tvar recovered interface{}\n\tfunc() {\n\t\tdefer func() { recovered = recover() }()\n\t\tvar d *Discount\n\t\t_ = d.Percentage\n\t}()\n\tif recovered == nil { t.Fatal(\"expected nil dereference panic\") }\n}"
+}

@@ -1,0 +1,9 @@
+{
+  "pr_id": "PR-09",
+  "category": "CLEAN",
+  "title": "Add input validation for CreateOrder API request",
+  "diff_content": "diff --git a/internal/api/order.go b/internal/api/order.go\n--- a/internal/api/order.go\n+++ b/internal/api/order.go\n@@ -10,0 +10,8 @@ func (h *OrderHandler) Create(w http.ResponseWriter, r *http.Request) {\n+\tif req.Quantity <= 0 {\n+\t\thttp.Error(w, \"quantity must be positive\", http.StatusBadRequest)\n+\t\treturn\n+\t}\n+\tif req.ProductID == \"\" {\n+\t\thttp.Error(w, \"product_id is required\", http.StatusBadRequest)\n+\t\treturn\n+\t}\n",
+  "expected_verdict": "APPROVED",
+  "expected_rules": [],
+  "golden_repro_snippet": "// No defect \u2014 APPROVED"
+}
