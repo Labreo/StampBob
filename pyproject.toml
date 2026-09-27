@@ -1,0 +1,13 @@
+[project]
+name = "stampbob"
+version = "0.1.0"
+dependencies = [
+    "fastapi>=0.111.0",
+    "uvicorn>=0.30.0",
+    "pydantic>=2.7.0",
+    "pytest>=8.2.0",
+    "ibm-watsonx-ai>=1.0.0",
+]
+
+[tool.vercel]
+entrypoint = "src.web.server:app"

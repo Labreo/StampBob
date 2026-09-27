@@ -63,3 +63,5 @@ logs/
 # --- StampBob Eval Sandbox Scratch ---
 # Temporary sandbox directories created by benchmark_harness / sandbox_runner
 stampbob_repro_*/
+.vercel
+.env*
